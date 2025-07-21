@@ -1,6 +1,5 @@
 {
-  "name": "Top Dent - v10.1",
-  "description": "A comprehensive dental clinic management application for patient records, appointments, anamnesis, and treatment plans.",
-  "requestFramePermissions": [],
-  "prompt": ""
+  "name": "TicketSwap Hub",
+  "description": "A modern Software as a Service (SaaS) platform designed for seamlessly swapping event tickets. Connect with a community of fans to trade tickets for concerts, festivals, theater, and more in a secure and user-friendly environment.",
+  "requestFramePermissions": []
 }
