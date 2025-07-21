@@ -1,127 +1,246 @@
 
-import React, { useState, useMemo, createContext, useContext, useCallback } from 'react';
-import { mockTickets, mockUsers, mockProposals } from './constants';
-import { Ticket, User, TradeProposal, Theme } from './types';
-import Header from './components/Header';
-import Footer from './components/Footer';
-import HomePage from './views/HomePage';
-import ProfilePage from './views/ProfilePage';
-import LoginPage from './views/LoginPage';
-import TradeModal from './components/TradeModal';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { HashRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { Header } from './components/layout/Header';
+import { Footer } from './components/layout/Footer';
+import { DashboardPage } from './pages/DashboardPage';
+import { NewPatientPage } from './pages/NewPatientPage';
+import { AnamnesisFormPage } from './pages/AnamnesisFormPage';
+import { TreatmentPlanPage } from './pages/TreatmentPlanPage';
+import { PatientListPage } from './pages/PatientListPage';
+import { PatientDetailPage } from './pages/PatientDetailPage';
+import { AppointmentsPage } from './pages/AppointmentsPage';
+import { PatientAnamnesisPage } from './pages/PatientAnamnesisPage';
+import { PatientTreatmentPlansPage } from './pages/PatientTreatmentPlansPage';
+import { AllTreatmentPlansPage } from './pages/AllTreatmentPlansPage';
+import { ViewRecordPage } from './pages/ViewRecordPage';
+import { LoginPage } from './pages/LoginPage';
+import { DentistDashboardPage } from './pages/DentistDashboardPage'; 
+import { ConfigurationsPage } from './pages/ConfigurationsPage';
+import { ManageAppointmentPage } from './pages/ManageAppointmentPage'; 
+import { ConsultationHistoryPage } from './pages/ConsultationHistoryPage';
+import { ReturnsPage } from './pages/ReturnsPage'; 
+import { NavigationPath, ChatMessage } from './types';
+import { Button } from './components/ui/Button';
+import { ToastProvider } from './contexts/ToastContext';
+import { ChangelogModal } from './components/ChangelogModal';
+import { DentistChangelogModal } from './components/DentistChangelogModal';
+import { ChatWidget } from './components/ChatWidget';
+import { DentistChatWidget } from './components/DentistChatWidget';
 
-type AppContextType = {
-  theme: Theme;
-  toggleTheme: () => void;
-  currentUser: User | null;
-  login: (user: User) => void;
-  logout: () => void;
-  tickets: Ticket[];
-  proposals: TradeProposal[];
-  createProposal: (proposal: Omit<TradeProposal, 'id' | 'status' | 'proposer'>) => void;
-  selectedTicket: Ticket | null;
-  handleSelectTicket: (ticket: Ticket | null) => void;
-  isTradeModalOpen: boolean;
-  setTradeModalOpen: (isOpen: boolean) => void;
-};
 
-const AppContext = createContext<AppContextType | null>(null);
+export type UserRole = 'admin' | 'dentist' | null;
 
-export const useAppContext = () => {
-    const context = useContext(AppContext);
-    if (!context) {
-        throw new Error('useAppContext must be used within an AppProvider');
-    }
-    return context;
-};
+interface AppLayoutProps {
+  onLogout: () => void;
+  userRole: UserRole;
+  userName: string | null;
+  children: React.ReactNode;
+}
 
-export default function App() {
-  const [theme, setTheme] = useState<Theme>('light');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeView, setActiveView] = useState<'home' | 'profile' | 'login'>('home');
-  
-  const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
-  const [proposals, setProposals] = useState<TradeProposal[]>(mockProposals);
-  
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [isTradeModalOpen, setTradeModalOpen] = useState(false);
-
-  const toggleTheme = useCallback(() => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  }, [theme]);
-  
-  const login = (user: User) => {
-    setCurrentUser(user);
-    setActiveView('home');
-  };
-
-  const logout = () => {
-    setCurrentUser(null);
-    setActiveView('home');
-  };
-
-  const createProposal = (proposal: Omit<TradeProposal, 'id' | 'status' | 'proposer'>) => {
-    if (!currentUser) return;
-    const newProposal: TradeProposal = {
-      ...proposal,
-      id: `prop${proposals.length + 1}`,
-      proposer: currentUser,
-      status: 'pending',
-    };
-    setProposals(prev => [...prev, newProposal]);
-    setTradeModalOpen(false);
-    // In a real app, show a success notification
-  };
-  
-  const handleSelectTicket = (ticket: Ticket | null) => {
-    setSelectedTicket(ticket);
-    if(ticket) {
-      setTradeModalOpen(true);
-    }
-  };
-
-  const value = useMemo(() => ({
-    theme,
-    toggleTheme,
-    currentUser,
-    login,
-    logout,
-    tickets,
-    proposals,
-    createProposal,
-    selectedTicket,
-    handleSelectTicket,
-    isTradeModalOpen,
-    setTradeModalOpen
-  }), [theme, toggleTheme, currentUser, tickets, proposals, selectedTicket, isTradeModalOpen, handleSelectTicket]);
-
-  const renderView = () => {
-    if (!currentUser && activeView !== 'login') {
-        return <LoginPage onLogin={() => setActiveView('login')} />;
-    }
-
-    switch (activeView) {
-      case 'profile':
-        return <ProfilePage />;
-      case 'login':
-        return <LoginPage onLogin={() => setActiveView('home')} />;
-      case 'home':
-      default:
-        return <HomePage />;
-    }
-  };
+const AppLayout: React.FC<AppLayoutProps> = ({ onLogout, userRole, userName, children }) => {
+  const mainPadding = userRole === 'dentist' 
+    ? "px-2 sm:px-4 lg:px-4" 
+    : "px-4 sm:px-6 lg:px-8"; 
 
   return (
-    <AppContext.Provider value={value}>
-      <div className="flex flex-col min-h-screen">
-        <Header setActiveView={setActiveView} />
-        <main className="flex-grow container mx-auto px-4 py-8">
-            {renderView()}
-        </main>
-        <Footer />
-        {isTradeModalOpen && selectedTicket && <TradeModal />}
-      </div>
-    </AppContext.Provider>
+    <div className="flex flex-col min-h-screen bg-[#0e0e0e] text-white selection:bg-[#00bcd4] selection:text-black">
+      <Header onLogout={onLogout} userRole={userRole} userName={userName} />
+      <main className={`flex-grow pt-28 pb-12 ${mainPadding}`}>
+        <div>
+           {children}
+        </div>
+      </main>
+      <Footer />
+    </div>
   );
-}
+};
+
+const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
+  <div className="text-center py-10">
+    <h1 className="text-3xl font-bold text-[#00bcd4]">{title}</h1>
+    <p className="text-[#b0b0b0] mt-4">Esta página está em construção.</p>
+    <Link to={NavigationPath.Home} className="mt-6 inline-block">
+        <Button variant="primary">Voltar ao Início</Button>
+    </Link>
+  </div>
+);
+
+const SESSION_STORAGE_KEY = 'topDentUserSession_v1';
+
+const App: React.FC = () => {
+  const [userRole, setUserRole] = useState<UserRole>(null);
+  const [userDisplayFullName, setUserDisplayFullName] = useState<string | null>(null); 
+  const [userIdForApi, setUserIdForApi] = useState<string | null>(null); 
+  const [userUsername, setUserUsername] = useState<string | null>(null);
+  const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
+  const [isDentistChangelogModalOpen, setIsDentistChangelogModalOpen] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    try {
+      const persistedSession = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (persistedSession) {
+        const sessionData = JSON.parse(persistedSession);
+        if (sessionData && sessionData.userRole && sessionData.userIdForApi && sessionData.userDisplayFullName) {
+          setUserRole(sessionData.userRole);
+          setUserIdForApi(sessionData.userIdForApi);
+          setUserUsername(sessionData.userUsername);
+          setUserDisplayFullName(sessionData.userDisplayFullName);
+        } else {
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+      }
+    } catch (error) {
+      console.error("Could not load user session from localStorage", error);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } finally {
+      setIsInitializing(false);
+    }
+  }, []);
+  
+  const handleLoginSuccess = useCallback((role: UserRole, idForApi: string, username: string, displayFullName: string) => {
+    const sessionData = { 
+      userRole: role, 
+      userIdForApi: idForApi, 
+      userUsername: username, 
+      userDisplayFullName: displayFullName 
+    };
+    setUserRole(role);
+    setUserIdForApi(idForApi);
+    setUserUsername(username);
+    setUserDisplayFullName(displayFullName);
+    
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+    } catch (error) {
+      console.error("Could not save user session to localStorage", error);
+    }
+    if (role === 'admin') {
+        setIsChangelogModalOpen(true);
+    }
+    if (role === 'dentist') {
+      setIsDentistChangelogModalOpen(true);
+    }
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    setUserRole(null);
+    setUserIdForApi(null);
+    setUserUsername(null);
+    setUserDisplayFullName(null);
+    setIsChangelogModalOpen(false);
+    setIsDentistChangelogModalOpen(false);
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch (error) {
+      console.error("Could not remove user session from localStorage", error);
+    }
+  }, []);
+
+  const handleCloseChangelogModal = () => {
+    setIsChangelogModalOpen(false);
+  };
+  
+  const handleCloseDentistChangelogModal = () => {
+    setIsDentistChangelogModalOpen(false);
+  };
+
+  const ProtectedRoute: React.FC<{children: JSX.Element; adminOnly?: boolean}> = ({ children, adminOnly = false }) => {
+    if (isInitializing) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-[#0e0e0e] text-white">
+            Carregando sessão...
+        </div>
+      );
+    }
+    if (!userRole) {
+      return <Navigate to="/login" replace />;
+    }
+    if (adminOnly && userRole !== 'admin') {
+      return <Navigate to="/" replace />; 
+    }
+    return children;
+  };
+  
+  const renderDashboard = () => {
+    if (userRole === 'admin') {
+      return <DashboardPage onLogout={handleLogout} />;
+    }
+    if (userRole === 'dentist' && userIdForApi && userUsername && userDisplayFullName) {
+      return (
+        <DentistDashboardPage
+            dentistId={userIdForApi}
+            dentistUsername={userUsername}
+            dentistDisplayFullName={userDisplayFullName}
+        />
+      );
+    }
+    return <Navigate to="/login" replace />; 
+  };
+
+  if (isInitializing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0e0e0e] text-white">
+        Inicializando...
+      </div>
+    );
+  }
+
+  return (
+    <ToastProvider>
+      <HashRouter>
+        {userRole === 'admin' && <ChangelogModal isOpen={isChangelogModalOpen} onClose={handleCloseChangelogModal} />}
+        {userRole === 'dentist' && <DentistChangelogModal isOpen={isDentistChangelogModalOpen} onClose={handleCloseDentistChangelogModal} />}
+        <Routes>
+          <Route
+            path="/login"
+            element={userRole && !isInitializing ? <Navigate to="/" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />}
+          />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <>
+                  <AppLayout onLogout={handleLogout} userRole={userRole} userName={userDisplayFullName}>
+                    <Routes>
+                      <Route index element={renderDashboard()} />
+                      <Route path={NavigationPath.NewPatient.substring(1)} element={<ProtectedRoute adminOnly>{<NewPatientPage />}</ProtectedRoute>} />
+                      <Route path={NavigationPath.EditPatient.substring(1)} element={<ProtectedRoute adminOnly>{<NewPatientPage />}</ProtectedRoute>} />
+                      <Route path={NavigationPath.PatientsList.substring(1)} element={<ProtectedRoute adminOnly>{<PatientListPage />}</ProtectedRoute>} />
+                      <Route path={NavigationPath.Anamnesis.substring(1)} element={<ProtectedRoute adminOnly>{<AnamnesisFormPage />}</ProtectedRoute>} />
+                      <Route path={NavigationPath.AllTreatmentPlans.substring(1)} element={<ProtectedRoute adminOnly>{<AllTreatmentPlansPage />}</ProtectedRoute>} />
+                      <Route path={NavigationPath.Configurations.substring(1)} element={<ProtectedRoute adminOnly>{<ConfigurationsPage />}</ProtectedRoute>} />
+                      <Route path={NavigationPath.Appointments.substring(1)} element={<ProtectedRoute adminOnly><AppointmentsPage /></ProtectedRoute>} />
+                      <Route path={NavigationPath.NewAppointment.substring(1)} element={<ProtectedRoute adminOnly><ManageAppointmentPage /></ProtectedRoute>} />
+                      <Route path={NavigationPath.EditAppointment.substring(1)} element={<ProtectedRoute adminOnly><ManageAppointmentPage /></ProtectedRoute>} />
+                      <Route path={NavigationPath.Return.substring(1)} element={<ProtectedRoute adminOnly><ReturnsPage /></ProtectedRoute>} />
+                      <Route path={NavigationPath.TreatmentPlan.substring(1)} element={<TreatmentPlanPage />} />
+                      <Route path={NavigationPath.EditTreatmentPlan.substring(1)} element={<TreatmentPlanPage />} />
+                      <Route path={NavigationPath.ConsultationHistory.substring(1)} element={<ConsultationHistoryPage />} />
+                      <Route path={NavigationPath.PatientDetail.substring(1)} element={<PatientDetailPage />} />
+                      <Route path={NavigationPath.PatientAnamnesis.substring(1)} element={<PatientAnamnesisPage />} />
+                      <Route path={NavigationPath.PatientTreatmentPlans.substring(1)} element={<PatientTreatmentPlansPage />} />
+                      <Route path={NavigationPath.ViewRecord.substring(1)} element={<ViewRecordPage />} />
+                      <Route path="*" element={<PlaceholderPage title="Página não encontrada" />} />
+                    </Routes>
+                  </AppLayout>
+
+                  {userRole === 'admin' && userIdForApi && (
+                     <ChatWidget adminId={userIdForApi} />
+                  )}
+                  
+                  {userRole === 'dentist' && userIdForApi && (
+                     <DentistChatWidget dentistId={userIdForApi} />
+                  )}
+                </>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </HashRouter>
+    </ToastProvider>
+  );
+};
+
+export default App;
